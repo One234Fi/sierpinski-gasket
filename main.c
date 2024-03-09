@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-const uint32_t NUM_POINTS = 100;
+const uint32_t NUM_POINTS = 10000;
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -30,19 +30,23 @@ const uint32_t NUM_DEVICE_EXTENSIONS =
     const bool enableValidationLayers = true;
 #endif
 
-Vertex vertices[100] = {};
 
 void print_points(Vertex* points, uint32_t NUM_POINTS);
 
-int generate_points(uint32_t numPoints, uint32_t width, uint32_t height, Vertex* vertices) {
+int generate_points(uint32_t numPoints, Vertex* vertices) {
     float triangle_vertices[3][2] = {
-        {0.0f, 0.0f}, 
-        {width / 2.0f, (float) height}, 
-        {(float) width, 0.0f}
+        {0.0f, -1.0f}, 
+        {1.0f, 1.0f},
+        {-1.0f, 1.0f}, 
+    };
+    float triangle_colors[3][3] = {
+        { 1.0f, 0.0f, 0.0f, },
+        { 0.0f, 1.0f, 0.0f, },
+        { 0.0f, 0.0f, 1.0f, },
     };
     Vertex p = {
         .pos = {0.0f, 0.0f}, 
-        .color ={1.0f, 0.0f, 0.0f}
+        .color ={0.0f, 0.0f, 0.0f}
     };
     int j;
     int rand();
@@ -50,8 +54,12 @@ int generate_points(uint32_t numPoints, uint32_t width, uint32_t height, Vertex*
     memset(out, 0, sizeof(Vertex) * numPoints);
     for (uint32_t k = 0; k < numPoints; k++) {
         j = rand()%3;
-        p.pos[0] = (p.pos[0] + triangle_vertices[j][0] - width) / 2 / width;
-        p.pos[1] = (p.pos[1] + triangle_vertices[j][1] - height) / 2 / height;
+        p.pos[0] = (p.pos[0] + triangle_vertices[j][0]) / 2;
+        p.pos[1] = (p.pos[1] + triangle_vertices[j][1]) / 2;
+
+        p.color[0] = (p.color[0] + triangle_colors[j][0]) / 2;
+        p.color[1] = (p.color[1] + triangle_colors[j][1]) / 2;
+        p.color[2] = (p.color[2] + triangle_colors[j][2]) / 2;
 
         out[k] = p;
     }
@@ -585,7 +593,7 @@ int createSwapchain(ctx* ctx) {
         .preTransform = capabilities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = presentMode,
-        .clipped = VK_TRUE,
+        .clipped = VK_FALSE,
         .oldSwapchain = VK_NULL_HANDLE,
     };
 
@@ -758,7 +766,6 @@ int createGraphicsPipeline(ctx* ctx) {
         vkDestroyShaderModule(ctx->logicalDevice, vertexShader, NULL);
         return false;
     }
-    fprintf(stdout, "shaders created\n");
     
     VkPipelineShaderStageCreateInfo vertexShaderStageInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -784,8 +791,6 @@ int createGraphicsPipeline(ctx* ctx) {
     VkVertexInputAttributeDescription attributeDescriptions[numAttributeDescriptions];
     getAttributeDescriptions(attributeDescriptions, &numAttributeDescriptions);
 
-    fprintf(stdout, "prog stages done\n");
-
     //Fixed function stages
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -800,8 +805,6 @@ int createGraphicsPipeline(ctx* ctx) {
         .topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
         .primitiveRestartEnable = VK_FALSE,
     };
-
-    fprintf(stdout, "input assembly\n");
 
     //Dynamic viewport set up, defers specifing viewport and scissor till draw 
     //time. If done as a proper fixed-function, a new pipeline would need to be 
@@ -822,15 +825,13 @@ int createGraphicsPipeline(ctx* ctx) {
         .scissorCount = 1,
     };
 
-    fprintf(stdout, "viewport\n");
-
     VkPipelineRasterizationStateCreateInfo rasterizer = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .depthClampEnable = VK_FALSE, 
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = VK_POLYGON_MODE_FILL,
         .lineWidth = 1.0f,
-        .cullMode = VK_CULL_MODE_BACK_BIT,
+        .cullMode = VK_CULL_MODE_NONE,
         .frontFace = VK_FRONT_FACE_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
         .depthBiasConstantFactor = 0.0f,
@@ -888,7 +889,6 @@ int createGraphicsPipeline(ctx* ctx) {
         vkDestroyShaderModule(ctx->logicalDevice, fragmentShader, NULL);
         return false;
     }
-    fprintf(stdout, "created layout\n");
 
     //Create pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo = {
@@ -919,7 +919,6 @@ int createGraphicsPipeline(ctx* ctx) {
         vkDestroyShaderModule(ctx->logicalDevice, fragmentShader, NULL);
         return false;
     }
-    fprintf(stdout, "created graphics pipelines\n");
 
     vkDestroyShaderModule(ctx->logicalDevice, vertexShader, NULL);
     vkDestroyShaderModule(ctx->logicalDevice, fragmentShader, NULL);
@@ -1083,9 +1082,7 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size,
             &commandBuffer);
 }
 
-int createVertexBuffer(ctx* ctx) {
-    print_points(vertices, NUM_POINTS);
-
+int createVertexBuffer(ctx* ctx, Vertex* vertices) {
     VkDeviceSize bufferSize = sizeof(Vertex) * NUM_POINTS;
 
     VkBuffer stagingBuffer;
@@ -1104,9 +1101,7 @@ int createVertexBuffer(ctx* ctx) {
 
     void* data;
     vkMapMemory(ctx->logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, &vertices, (uint32_t) bufferSize);
-    printf("\n\ncopied points:\n\n");
-    print_points(data, NUM_POINTS);
+        memcpy(data, vertices, bufferSize);
     vkUnmapMemory(ctx->logicalDevice, stagingBufferMemory);
 
     if (!createBuffer(
@@ -1194,7 +1189,7 @@ int recordCommandBuffer(ctx* ctx, VkCommandBuffer commandBuffer, uint32_t imageI
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        vkCmdDraw(commandBuffer, NUM_POINTS, 1, 0, 0);
+        vkCmdDraw(commandBuffer, NUM_POINTS, NUM_POINTS, 0, 0);
         //vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
     vkCmdEndRenderPass(commandBuffer);
     
@@ -1235,7 +1230,7 @@ int createSyncObjects(ctx* ctx) {
     return true;
 }
 
-int initVulkan(ctx* ctx) {
+int initVulkan(ctx* ctx, Vertex* vertices) {
     ctx->MAX_FRAMES_IN_FLIGHT = 2;
     ctx->currentFrame = 0;
     ctx->framebufferResized = false;
@@ -1250,7 +1245,7 @@ int initVulkan(ctx* ctx) {
     if (!createGraphicsPipeline(ctx)) { return false; }
     if (!createFramebuffers(ctx)) { return false; }
     if (!createCommandPools(ctx)) { return false; }
-    if (!createVertexBuffer(ctx)) { return false; }
+    if (!createVertexBuffer(ctx, vertices)) { return false; }
     if (!createCommandBuffers(ctx)) { return false; }
     if (!createSyncObjects(ctx)) { return false; }
     return true;
@@ -1436,15 +1431,16 @@ int main() {
     ctx* app = malloc(sizeof(ctx));
     memset(app, 0, sizeof(ctx));
     uint32_t exit_code = EXIT_SUCCESS;
+    Vertex vertices[NUM_POINTS];
+    memset(vertices, 0, NUM_POINTS * sizeof(Vertex));
 
-    generate_points(NUM_POINTS, WIDTH, HEIGHT, vertices);
-    //print_points(vertices, NUM_POINTS);
+    generate_points(NUM_POINTS, vertices);
 
     if (!initWindow(app)) {
         fprintf(stderr, "Problem with window initialization\n");
         exit_code = EXIT_FAILURE;
     }
-    if (!exit_code && !initVulkan(app)) {
+    if (!exit_code && !initVulkan(app, vertices)) {
         fprintf(stderr, "Problem with vulkan initialization\n");
         exit_code = EXIT_FAILURE;
     }
