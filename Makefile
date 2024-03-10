@@ -3,7 +3,7 @@ CFLAGS := -Wall -Wextra -Wno-unused-parameter -g -MMD
 LDLIBS := -lglfw -lvulkan -lpthread -ldl -lX11 -lXxf86vm -lXrandr -lXi
 LDFLAGS := 
 
-SRCS := main.c
+SRCS := main.c vector.c
 OBJS := $(SRCS:.c=.o)
 DEPS := $(OBJS:.o=.d)
 
@@ -14,7 +14,7 @@ else
 	CFLAGS+=-DNDEBUG
 endif
 	
-app.out: main.o
+app.out: $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS) $(LDFLAGS)
 
 shaders/vert.spv:
