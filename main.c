@@ -311,6 +311,9 @@ void findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, qfi* indic
                 !(queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             indices->transferFamily = i;
             indices->hasTransfer = true;
+        } else if (queueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT) {
+            indices->transferFamily = i;
+            indices->hasTransfer = true;
         }
 
         if (qfiComplete(indices)) {
@@ -430,7 +433,7 @@ int pickPhysicalDevice(ctx* ctx) {
         } else if (isDeviceSuitable(devices[i], ctx->surface)) {
             fprintf(stdout, "Found a suitable non-discrete GPU\n");
             physicalDevice = devices[i];
-        }
+        } 
     }
 
     if (physicalDevice == VK_NULL_HANDLE) {
